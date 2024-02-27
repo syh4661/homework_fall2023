@@ -104,6 +104,9 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
 
             torch.zeros(self.ac_dim, dtype=torch.float32, device=ptu.device)
         )
+
+        self.loss=nn.MSELoss()
+
         self.logstd.to(ptu.device)
         self.optimizer = optim.Adam(
             itertools.chain([self.logstd], self.mean_net.parameters()),
@@ -129,7 +132,8 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         # through it. For example, you can return a torch.FloatTensor. You can also
         # return more flexible objects, such as a
         # `torch.distributions.Distribution` object. It's up to you!
-        raise NotImplementedError
+        obs_in=torch.Tensor(observation).to(ptu.device)
+        return self.mean_net(obs_in)
 
     def update(self, observations, actions):
         """
@@ -141,7 +145,7 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             dict: 'Training Loss': supervised learning loss
         """
         # TODO: update the policy and return the loss
-        loss = TODO
+        loss = self.loss(self.forward(observations),torch.Tensor(actions).to(ptu.device))
         return {
             # You can add extra logging information here, but keep this line
             'Training Loss': ptu.to_numpy(loss),
