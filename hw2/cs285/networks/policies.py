@@ -59,7 +59,12 @@ class MLPPolicy(nn.Module):
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         """Takes a single observation (as a numpy array) and returns a single action (as a numpy array)."""
         # TODO: implement get_action
-        action = None
+        if hasattr(self,'mean_net'):
+            action = self.mean_net(obs)
+        elif hasattr(self,'logits_net'):
+            action = self.logits_net(obs)
+        else:
+            raise Exception
 
         return action
 
