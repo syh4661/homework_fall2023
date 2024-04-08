@@ -18,13 +18,13 @@ class MLPPolicy(nn.Module):
     """
 
     def __init__(
-        self,
-        ac_dim: int,
-        ob_dim: int,
-        discrete: bool,
-        n_layers: int,
-        layer_size: int,
-        learning_rate: float,
+            self,
+            ac_dim: int,
+            ob_dim: int,
+            discrete: bool,
+            n_layers: int,
+            layer_size: int,
+            learning_rate: float,
     ):
         super().__init__()
 
@@ -59,13 +59,9 @@ class MLPPolicy(nn.Module):
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         """Takes a single observation (as a numpy array) and returns a single action (as a numpy array)."""
         # TODO: implement get_action
-        if hasattr(self,'mean_net'):
-            action = self.mean_net(obs)
-        elif hasattr(self,'logits_net'):
-            action = self.logits_net(obs)
-        else:
-            raise Exception
 
+
+        action = self.forward(ptu.from_numpy(obs))
         return action
 
     def forward(self, obs: torch.FloatTensor):
@@ -74,13 +70,21 @@ class MLPPolicy(nn.Module):
         able to differentiate through it. For example, you can return a torch.FloatTensor. You can also return more
         flexible objects, such as a `torch.distributions.Distribution` object. It's up to you!
         """
+        # if self.discrete:
+        #     # TODO: define the forward pass for a policy with a discrete action space.
+        #
+        #     pass
+        # else:
+        #     # TODO: define the forward pass for a policy with a continuous action space.
+        #
+        #     pass
+
         if self.discrete:
-            # TODO: define the forward pass for a policy with a discrete action space.
-            pass
+            action = self.logits_net(obs)
         else:
-            # TODO: define the forward pass for a policy with a continuous action space.
-            pass
-        return None
+            action = self.mean_net(obs)
+
+        return ptu.to_numpy(action)
 
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """Performs one iteration of gradient descent on the provided batch of data."""
@@ -91,10 +95,10 @@ class MLPPolicyPG(MLPPolicy):
     """Policy subclass for the policy gradient algorithm."""
 
     def update(
-        self,
-        obs: np.ndarray,
-        actions: np.ndarray,
-        advantages: np.ndarray,
+            self,
+            obs: np.ndarray,
+            actions: np.ndarray,
+            advantages: np.ndarray,
     ) -> dict:
         """Implements the policy gradient actor update."""
         obs = ptu.from_numpy(obs)
