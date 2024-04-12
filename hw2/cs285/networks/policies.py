@@ -80,9 +80,13 @@ class MLPPolicy(nn.Module):
         #     pass
 
         if self.discrete:
-            action = self.logits_net(obs)
+            logits = self.logits_net(obs)
+            action = torch.distributions.Categorical(logits=logits).sample()
         else:
-            action = self.mean_net(obs)
+            mean = self.mean_net(obs)
+            std = torch.exp(self.logstd)
+            normal_dist = torch.distributions.Normal(mean, std)
+            action = normal_dist.sample()
 
         return ptu.to_numpy(action)
 
@@ -107,7 +111,7 @@ class MLPPolicyPG(MLPPolicy):
 
         # TODO: implement the policy gradient actor update.
         loss = None
-
+        #
         return {
             "Actor Loss": ptu.to_numpy(loss),
         }

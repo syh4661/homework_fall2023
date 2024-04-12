@@ -75,7 +75,7 @@ class PGAgent(nn.Module):
 
         # step 3: use all datapoints (s_t, a_t, adv_t) to update the PG actor/policy
         # TODO: update the PG actor/policy network once using the advantages
-        info: dict = None
+        info: dict = self.actor.update(obs=obs,actions=actions,advantages=advantages)
 
         # step 4: if needed, use all datapoints (s_t, a_t, q_t) to update the PG critic/baseline
         if self.critic is not None:
@@ -105,10 +105,10 @@ class PGAgent(nn.Module):
 
     def _estimate_advantage(
         self,
-        obs: np.ndarray,
-        rewards: np.ndarray,
-        q_values: np.ndarray,
-        terminals: np.ndarray,
+            obs: np.ndarray,
+            rewards: np.ndarray,
+            q_values: np.ndarray,
+            terminals: np.ndarray,
     ) -> np.ndarray:
         """Computes advantages by (possibly) subtracting a value baseline from the estimated Q-values.
 
@@ -117,6 +117,8 @@ class PGAgent(nn.Module):
         if self.critic is None:
             # TODO: if no baseline, then what are the advantages?
             advantages = None
+            advantages = q_values - q_values.mean
+
         else:
             # TODO: run the critic and use it as a baseline
             values = None
@@ -156,6 +158,7 @@ class PGAgent(nn.Module):
         Note that all entries of the output list should be the exact same because each sum is from 0 to T (and doesn't
         involve t)!
         """
+        self.gamma
         return None
 
 
