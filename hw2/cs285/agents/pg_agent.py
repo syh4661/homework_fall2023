@@ -104,8 +104,9 @@ class PGAgent(nn.Module):
             # Case 2: in reward-to-go PG, we only use the rewards after timestep t to estimate the Q-value for (s_t, a_t).
             # In other words: Q(s_t, a_t) = sum_{t'=t}^T gamma^(t'-t) * r_{t'}
             # TODO: use the helper function self._discounted_reward_to_go to calculate the Q-values
-            q_values = self._discounted_reward_to_go(rewards)
-
+            q_values = list()
+            for reward in rewards:
+                q_values+=self._discounted_reward_to_go(reward)
         return np.array(q_values)
 
     def _estimate_advantage(
@@ -150,8 +151,16 @@ class PGAgent(nn.Module):
 
         # TODO: normalize the advantages to have a mean of zero and a standard deviation of one within the batch
         if self.normalize_advantages:
-            pass
 
+            ind=1
+            adv_ind=0
+            for terminal in terminals:
+                if terminal == 1:
+                    advantages[adv_ind:adv_ind+ind]/=ind
+                    adv_ind+=ind
+                    ind=1
+                else:
+                    ind+=1
         return np.array(advantages)
 
     def _discounted_return(self, rewards: Sequence[float]) -> Sequence[float]:
@@ -165,7 +174,11 @@ class PGAgent(nn.Module):
         discount_rewards=list()
         for i in range(len(rewards)):
             discount_rewards.append(self.gamma ** i * rewards[i])
-        return discount_rewards
+        _sum = sum(discount_rewards)
+        new_rewards = list()
+        for i in range(len(rewards)):
+            new_rewards.append(_sum)
+        return new_rewards
 
 
     def _discounted_reward_to_go(self, rewards: Sequence[float]) -> Sequence[float]:
@@ -173,10 +186,13 @@ class PGAgent(nn.Module):
         Helper function which takes a list of rewards {r_0, r_1, ..., r_t', ... r_T} and returns a list where the entry
         in each index t' is sum_{t'=t}^T gamma^(t'-t) * r_{t'}.
         """
-        new_rewards = list()
-        for reward in rewards:
-            sum = 0
-            for i in range(len(reward)):
-                sum += self.gamma ** i * reward[i]
-            new_rewards.append(sum)
-        return new_rewards
+        discount_rewards_to_go=list()
+        for i in range(len(rewards)):
+            _discountee = list()
+            jind=0
+            for j in range(i,len(rewards)):
+                _discountee.append(self.gamma ** jind * rewards[j])
+                jind+=1
+            discount_rewards_to_go.append(sum(_discountee))
+
+        return discount_rewards_to_go
