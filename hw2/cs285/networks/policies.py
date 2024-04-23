@@ -66,14 +66,12 @@ class MLPPolicy(nn.Module):
         if self.discrete:
             action = torch.distributions.Categorical(logits=outputs).sample()
         else:
-            std = torch.exp(self.logstd)
-            normal_dist = torch.distributions.Normal(mean, std)
-            action = normal_dist.sample()
+            action = outputs.sample()
         return ptu.to_numpy(action)
 
 
 
-    def forward(self, obs: torch.FloatTensor):
+    def forward(self, obs: torch.FloatTensor) -> object:
         """
         This function defines the forward pass of the network.  You can return anything you want, but you should be
         able to differentiate through it. For example, you can return a torch.FloatTensor. You can also return more
@@ -90,11 +88,11 @@ class MLPPolicy(nn.Module):
 
         if self.discrete:
             outputs = self.logits_net(obs)
-
         else:
             mean = self.mean_net(obs)
             std = torch.exp(self.logstd)
-            outputs = torch.distributions.Normal(mean, std)
+            # outputs = torch.distributions.Normal(mean, std)
+            outputs = torch.distributions.MultivariateNormal(mean, scale_tril=torch.diag(std))
         return outputs
 
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
@@ -118,12 +116,21 @@ class MLPPolicyPG(MLPPolicy):
 
         # TODO: implement the policy gradient actor update.
         #
+        self.train()
         self.optimizer.zero_grad()
 
-        action_prob=self.forward(obs)
-        actions=actions.unsqueeze(-1)
-        action_prob=action_prob.gather(index=actions.to(torch.long), dim=1)
-        loss = -(action_prob*advantages).mean()
+
+        if self.discrete:
+            action_prob = self.forward(obs)
+            actions = actions.unsqueeze(-1)
+            action_prob = action_prob.gather(index=actions.to(torch.long), dim=1)
+            loss = -(action_prob * advantages).mean()
+        else:
+            outputs = self.forward(obs)
+            log_probs = outputs.log_prob(actions)  # 로그 확률 계산
+            advantages = advantages
+            loss = -(log_probs * advantages).mean()
+
 
         loss.backward()
         self.optimizer.step()

@@ -71,6 +71,7 @@ class PGAgent(nn.Module):
         actions=np.array([item for sublist in actions for item in sublist])
         rewards=np.array([item for sublist in rewards for item in sublist])
         terminals=np.array([item for sublist in terminals for item in sublist])
+        q_values=np.array([item for sublist in q_values for item in sublist])
         # step 2: calculate advantages from Q values
         advantages: np.ndarray = self._estimate_advantage(
             obs, rewards, q_values, terminals
@@ -83,30 +84,27 @@ class PGAgent(nn.Module):
         # step 4: if needed, use all datapoints (s_t, a_t, q_t) to update the PG critic/baseline
         if self.critic is not None:
             # TODO: perform `self.baseline_gradient_steps` updates to the critic/baseline network
-            critic_info: dict = None
-
+            for i in range(self.baseline_gradient_steps):
+                critic_info: dict = self.critic.update(obs, q_values)
             info.update(critic_info)
 
         return info
 
     def _calculate_q_vals(self, rewards: Sequence[np.ndarray]) -> Sequence[np.ndarray]:
         """Monte Carlo estimation of the Q function."""
+        q_values = []
 
         if not self.use_reward_to_go:
-            # Case 1: in trajectory-based PG, we ignore the timestep and instead use the discounted return for the entire
-            # trajectory at each point.
-            # In other words: Q(s_t, a_t) = sum_{t'=0}^T gamma^t' r_{t'}
-            # TODO: use the helper function self._discounted_return to calculate the Q-values
-            q_values = list()
+            # Case 1: Use the total discounted return from the start of the trajectory for each point
             for reward in rewards:
-                q_values+=self._discounted_return(reward)
+                total_discounted_return = self._discounted_return(reward)
+                # Extend the q_values list with repeated total discounted return for the length of the trajectory
+                q_values.append([total_discounted_return] * len(reward))
         else:
-            # Case 2: in reward-to-go PG, we only use the rewards after timestep t to estimate the Q-value for (s_t, a_t).
-            # In other words: Q(s_t, a_t) = sum_{t'=t}^T gamma^(t'-t) * r_{t'}
-            # TODO: use the helper function self._discounted_reward_to_go to calculate the Q-values
-            q_values = list()
+            # Case 2: Use the discounted reward to go for each point in the trajectory
             for reward in rewards:
-                q_values+=self._discounted_reward_to_go(reward)
+                q_values.append(self._discounted_reward_to_go(reward))
+
         return np.array(q_values)
 
     def _estimate_advantage(
@@ -120,18 +118,21 @@ class PGAgent(nn.Module):
 
         Operates on flat 1D NumPy arrays.
         """
+
         if self.critic is None:
             # TODO: if no baseline, then what are the advantages?
-            advantages = q_values
+            advantages = q_values.copy()
 
         else: # use baseline
             # TODO: run the critic and use it as a baseline
-            values = None
+            values = self.critic(ptu.from_numpy(obs)).squeeze()
             assert values.shape == q_values.shape
 
             if self.gae_lambda is None:
                 # TODO: if using a baseline, but not GAE, what are the advantages?
-                advantages = None
+                    advantages = q_values.copy()-ptu.to_numpy(values)
+                # advantages = {reawrd to go}-value function_pi(s_it)
+
             else:
                 # TODO: implement GAE
                 batch_size = obs.shape[0]
@@ -180,19 +181,11 @@ class PGAgent(nn.Module):
             new_rewards.append(_sum)
         return new_rewards
 
-
     def _discounted_reward_to_go(self, rewards: Sequence[float]) -> Sequence[float]:
-        """
-        Helper function which takes a list of rewards {r_0, r_1, ..., r_t', ... r_T} and returns a list where the entry
-        in each index t' is sum_{t'=t}^T gamma^(t'-t) * r_{t'}.
-        """
-        discount_rewards_to_go=list()
-        for i in range(len(rewards)):
-            _discountee = list()
-            jind=0
-            for j in range(i,len(rewards)):
-                _discountee.append(self.gamma ** jind * rewards[j])
-                jind+=1
-            discount_rewards_to_go.append(sum(_discountee))
-
+        n = len(rewards)
+        discount_rewards_to_go = [0] * n
+        cumulative = 0
+        for i in reversed(range(n)):
+            cumulative = rewards[i] + self.gamma * cumulative  # 현재 보상 + (할인된 미래 보상)
+            discount_rewards_to_go[i] = cumulative
         return discount_rewards_to_go
