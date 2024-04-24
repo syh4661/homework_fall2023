@@ -18,9 +18,12 @@ def sample_trajectory(
     ob = env.reset()
     obs, acs, rewards, next_obs, terminals, image_obs = [], [], [], [], [], []
     steps = 0
+    import time
+    time.sleep(1)
     while True:
         # render an image
         if render:
+
             if hasattr(env, "sim"):
                 img = env.sim.render(camera_name="track", height=500, width=500)[::-1]
             else:

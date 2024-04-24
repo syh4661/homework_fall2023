@@ -105,7 +105,7 @@ class PGAgent(nn.Module):
             for reward in rewards:
                 q_values.append(self._discounted_reward_to_go(reward))
 
-        return np.array(q_values)
+        return q_values
 
     def _estimate_advantage(
         self,
@@ -136,16 +136,22 @@ class PGAgent(nn.Module):
             else:
                 # TODO: implement GAE
                 batch_size = obs.shape[0]
-
+                values_gae = values.detach().cpu().numpy()
                 # HINT: append a dummy T+1 value for simpler recursive calculation
-                values = np.append(values, [0])
+                values_gae = np.append(values_gae, [0])
                 advantages = np.zeros(batch_size + 1)
-
+                delta_T=0
                 for i in reversed(range(batch_size)):
                     # TODO: recursively compute advantage estimates starting from timestep T.
                     # HINT: use terminals to handle edge cases. terminals[i] is 1 if the state is the last in its
                     # trajectory, and 0 otherwise.
-                    pass
+                    if terminals[i]==1: # edge
+                        delta_T=rewards[i]-values[i]
+                        advantages[i]=delta_T
+                    else:
+                        delta_T = rewards[i] + self.gamma*values[i+1] - values[i]
+                        advantages[i]=delta_T+self.gamma*self.gae_lambda*advantages[i+1]
+
 
                 # remove dummy advantage
                 advantages = advantages[:-1]

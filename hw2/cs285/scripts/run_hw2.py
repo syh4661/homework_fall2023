@@ -107,10 +107,12 @@ def run_training_loop(args):
 
         if args.video_log_freq != -1 and itr % args.video_log_freq == 0:
             print("\nCollecting video rollouts...")
-            eval_video_trajs = utils.sample_n_trajectories(
-                env, agent.actor, MAX_NVIDEO, max_ep_len, render=True
-            )
+            env2 = gym.make(args.env_name, render_mode=None)
 
+            eval_video_trajs = utils.sample_n_trajectories(
+                env2, agent.actor, MAX_NVIDEO, max_ep_len, render=True
+            )
+            ## render issue
             logger.log_trajs_as_videos(
                 eval_video_trajs,
                 itr,
